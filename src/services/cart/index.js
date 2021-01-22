@@ -9,11 +9,19 @@ const router = express.Router();
 router.route("/:userId").get(async (req, res, next) => {
   try {
     const cart = await Cart.findAll({
-      include: [{ model: Product, include: [Category] }, User],
+      include: [{ model: Product, include:[Category] }, User],
+      attributes: [
+        [Sequelize.fn("count", Sequelize.col("productId")), "unitary_qty"],
+        [Sequelize.fn("sum", Sequelize.col("product.price")), "total"],
+      ],
+      group: ["product.id", "product->category.id", "user.id", "cart.id"],
       where: { userId: req.params.userId },
     });
-
-    res.send({ products: cart });
+    const qty = await Cart.count();
+    const total = await Cart.sum("product.price", {
+      include: { model: Product, attributes: [] },
+    });
+    res.send({ products: cart, qty, total });
   } catch (e) {
     console.log(e);
     next(e);
@@ -36,10 +44,7 @@ router
   
   router.route("/:id").delete(async (req, res, next) => {
     try {
-      Cart.destroy({ where: { id: req.params.id }}).then((rowsDeleted) => {
-        if (rowsDeleted > 0) res.send("Deleted");
-        else res.send("no match");
-      });
+     await Cart.destroy({ where: { productId : req.params.id }})
       res.send("deleted")
     } catch (e) {
       console.log(e);
